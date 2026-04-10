@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>1Mi aos 40</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#f0f2f5; --surface:#fff; --surface2:#f5f7fa; --border:#dde2ea;
+    --blue-dim:#c2d4ee; --blue-mid:#5b82bb; --blue-bright:#2f6bbf; --blue-soft:rgba(47,107,191,0.08);
+    --text:#1e2535; --text-muted:#8492a6;
+    --green:#2d9e6b; --green-dim:rgba(45,158,107,0.10);
+    --red:#d64545; --red-dim:rgba(214,69,69,0.09);
+    --mono:'DM Mono',monospace; --sans:'Sora',sans-serif;
+    --shadow:0 2px 12px rgba(30,37,53,0.07); --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding-bottom:72px;}
+
+  /* TABS */
+  .tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:50;background:var(--surface);border-top:1px solid var(--border);display:flex;height:58px;box-shadow:0 -2px 12px rgba(30,37,53,0.08);}
+  .tab-btn{flex:1;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:var(--sans);font-size:10px;color:var(--text-muted);font-weight:500;}
+  .tab-btn.active{color:var(--blue-bright);}
+  .tab-icon{font-size:20px;line-height:1;}
+  .page{display:none;} .page.active{display:block;}
+
+  /* HEADER */
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:18px 16px 14px;position:sticky;top:0;z-index:30;box-shadow:0 1px 8px rgba(30,37,53,0.07);}
+  .header-eyebrow{font-size:9px;letter-spacing:2.5px;color:var(--text-muted);text-transform:uppercase;font-family:var(--mono);margin-bottom:3px;}
+  .header-title{font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.5px;}
+  .header-title span{color:var(--blue-bright);}
+  .header-chips{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+  .chip{border-radius:8px;padding:5px 11px;font-family:var(--mono);font-size:11px;display:flex;align-items:center;gap:5px;}
+  .chip-age{background:var(--blue-soft);border:1px solid var(--blue-dim);color:var(--blue-bright);}
+  .chip-timer{background:var(--surface2);border:1px solid var(--border);color:var(--text-muted);}
+  .chip-timer b{color:var(--text);font-weight:600;}
+  .live-dot{width:6px;height:6px;background:var(--blue-bright);border-radius:50%;animation:pulse 2s infinite;flex-shrink:0;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.65)}}
+
+  /* CARDS */
+  .cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px;}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);}
+  .card.accent{border-color:var(--blue-dim);background:var(--blue-soft);}
+  .card-label{font-size:9px;letter-spacing:1.8px;color:var(--text-muted);text-transform:uppercase;font-family:var(--mono);margin-bottom:6px;}
+  .card-value{font-size:19px;font-weight:700;font-family:var(--mono);color:var(--blue-bright);line-height:1.1;}
+  .card-value.green{color:var(--green);}
+  .card-sub{font-size:10px;color:var(--text-muted);margin-top:3px;font-family:var(--mono);}
+
+  /* PROGRESS */
+  .progress-wrap{padding:0 14px 8px;}
+  .progress-header{display:flex;justify-content:space-between;margin-bottom:7px;}
+  .progress-label{font-size:10px;color:var(--text-muted);font-family:var(--mono);}
+  .progress-pct{font-size:10px;color:var(--blue-bright);font-family:var(--mono);font-weight:600;}
+  .progress-track{background:var(--surface2);border-radius:99px;height:9px;border:1px solid var(--border);overflow:visible;position:relative;}
+  .progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--blue-dim),var(--blue-bright));position:relative;transition:width .6s cubic-bezier(.4,0,.2,1);min-width:2px;}
+  .progress-fill::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);width:13px;height:13px;border-radius:50%;background:var(--blue-bright);border:2px solid white;box-shadow:0 0 0 3px rgba(47,107,191,0.2);}
+
+  /* SECTION */
+  .section-title{font-size:9px;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase;font-family:var(--mono);padding:14px 14px 8px;display:flex;align-items:center;gap:7px;}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border);}
+  .divider{height:1px;background:var(--border);margin:4px 14px;}
+
+  /* INPUTS */
+  .inputs{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 14px;}
+  .input-group{display:flex;flex-direction:column;gap:5px;}
+  .input-group label{font-size:9px;color:var(--text-muted);font-family:var(--mono);letter-spacing:1.2px;text-transform:uppercase;}
+  .input-group input{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px;color:var(--blue-bright);font-family:var(--mono);font-size:14px;outline:none;box-shadow:var(--shadow);-webkit-appearance:none;width:100%;}
+  .input-group input:focus{border-color:var(--blue-mid);}
+
+  /* YIELD */
+  .yield-row{display:flex;gap:8px;padding:0 14px;flex-wrap:wrap;}
+  .yield-badge{flex:1;min-width:90px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;text-align:center;box-shadow:var(--shadow);}
+  .yb-label{font-size:9px;color:var(--text-muted);font-family:var(--mono);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px;}
+  .yb-val{font-size:12px;font-family:var(--mono);color:var(--blue-bright);font-weight:600;}
+
+  /* TIMELINE */
+  .timeline{padding:0 14px;}
+  .tl-item{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);align-items:flex-start;}
+  .tl-item:last-child{border-bottom:none;}
+  .tl-left{display:flex;flex-direction:column;align-items:center;padding-top:2px;width:17px;flex-shrink:0;}
+  .tl-dot{width:15px;height:15px;border-radius:50%;border:2px solid var(--blue-dim);background:var(--bg);flex-shrink:0;}
+  .tl-dot.done{background:var(--green);border-color:var(--green);}
+  .tl-dot.current{border-color:var(--blue-bright);background:var(--blue-soft);box-shadow:0 0 0 3px rgba(47,107,191,0.12);}
+  .tl-dot.final{width:19px;height:19px;background:var(--blue-bright);border-color:var(--blue-bright);box-shadow:0 0 0 4px rgba(47,107,191,0.15);}
+  .tl-line{width:1px;flex:1;background:var(--border);min-height:14px;margin-top:3px;}
+  .tl-content{flex:1;min-width:0;}
+  .tl-date-row{display:flex;align-items:center;gap:6px;margin-bottom:2px;flex-wrap:wrap;}
+  .tl-date{font-size:10px;color:var(--text-muted);font-family:var(--mono);}
+  .tl-edit-btn{font-size:9px;color:var(--blue-mid);font-family:var(--mono);border:none;background:none;cursor:pointer;text-decoration:underline dotted;padding:0;}
+  .tl-tag{display:inline-block;font-size:8px;font-family:var(--mono);letter-spacing:.8px;padding:2px 6px;border-radius:4px;text-transform:uppercase;}
+  .tag-start{background:rgba(45,158,107,0.12);color:var(--green);}
+  .tag-now{background:rgba(47,107,191,0.1);color:var(--blue-bright);}
+  .tag-near{background:rgba(250,175,0,0.12);color:#8a6000;}
+  .tag-mid{background:rgba(100,80,200,0.08);color:#5050a0;}
+  .tag-far{background:var(--surface2);color:var(--text-muted);}
+  .tag-done{background:var(--green-dim);color:var(--green);}
+  .tag-final{background:rgba(47,107,191,0.12);color:var(--blue-bright);font-weight:700;}
+  .tl-name{font-size:13px;font-weight:600;color:var(--text);}
+  .tl-name.struck{text-decoration:line-through;color:var(--text-muted);}
+  .tl-amount{font-size:11px;font-family:var(--mono);color:var(--blue-mid);margin-top:2px;}
+  .tl-amount.done-c{color:var(--green);}
+  .tl-amount.final-c{color:var(--blue-bright);font-weight:700;font-size:13px;}
+  .tl-check{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--blue-dim);background:var(--surface);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow);}
+  .tl-check.checked{background:var(--green-dim);border-color:var(--green);}
+  .check-icon{font-size:11px;color:var(--green);font-weight:700;display:none;}
+  .tl-check.checked .check-icon{display:block;}
+
+  /* WALLETS PAGE */
+  .w-page-header{background:var(--surface);border-bottom:1px solid var(--border);padding:18px 16px 14px;position:sticky;top:0;z-index:30;box-shadow:0 1px 8px rgba(30,37,53,0.07);}
+  .w-page-eye{font-size:9px;letter-spacing:2.5px;color:var(--text-muted);text-transform:uppercase;font-family:var(--mono);margin-bottom:3px;}
+  .w-page-title{font-size:20px;font-weight:700;color:var(--text);}
+  .w-total-row{display:flex;align-items:baseline;gap:8px;margin-top:8px;}
+  .w-total-val{font-size:26px;font-weight:700;font-family:var(--mono);color:var(--blue-bright);}
+  .w-total-lbl{font-size:11px;color:var(--text-muted);font-family:var(--mono);}
+
+  .total-chart-box{margin:14px 14px 0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);}
+  .total-chart-lbl{font-size:9px;letter-spacing:2px;color:var(--text-muted);text-transform:uppercase;font-family:var(--mono);margin-bottom:10px;}
+  .total-chart-canvas{height:130px;position:relative;}
+  .chart-nodata{text-align:center;padding:30px 0;font-size:11px;color:var(--text-muted);font-family:var(--mono);}
+
+  .wallet-list{display:flex;flex-direction:column;gap:12px;padding:14px;}
+  .w-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+  .w-card-top{display:flex;align-items:center;justify-content:space-between;padding:14px 14px 10px;}
+  .w-card-left{display:flex;align-items:center;gap:10px;}
+  .w-icon{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+  .w-name{font-size:13px;font-weight:600;color:var(--text);}
+  .w-change{font-size:10px;font-family:var(--mono);margin-top:2px;}
+  .w-change.up{color:var(--green);} .w-change.down{color:var(--red);} .w-change.neutral{color:var(--text-muted);}
+  .w-val{font-size:18px;font-weight:700;font-family:var(--mono);}
+  .w-pct{font-size:9px;color:var(--text-muted);font-family:var(--mono);text-align:right;margin-top:2px;}
+
+  /* ACTION ROWS */
+  .w-actions{display:flex;gap:8px;padding:0 14px 12px;}
+  .w-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-family:var(--mono);font-size:14px;color:var(--text);outline:none;-webkit-appearance:none;min-width:0;}
+  .w-input:focus{border-color:var(--blue-mid);}
+  .w-btn{border:none;border-radius:9px;padding:9px 13px;font-family:var(--sans);font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;white-space:nowrap;}
+  .w-btn-add{background:var(--blue-bright);color:white;}
+  .w-btn-withdraw{background:var(--red-dim);color:var(--red);border:1px solid rgba(214,69,69,0.25);}
+
+  .w-mini-chart{padding:0 14px 12px;height:100px;position:relative;}
+  .w-no-chart{text-align:center;padding:12px 0 14px;font-size:10px;color:var(--text-muted);font-family:var(--mono);}
+
+  .w-hist-bar{display:flex;align-items:center;justify-content:center;padding:8px 14px;border-top:1px solid var(--border);background:var(--surface2);font-size:10px;color:var(--blue-mid);font-family:var(--mono);cursor:pointer;gap:5px;}
+  .w-hist-body{display:none;border-top:1px solid var(--border);max-height:160px;overflow-y:auto;}
+  .w-hist-body.open{display:block;}
+  .w-hist-row{display:flex;align-items:center;justify-content:space-between;padding:7px 14px;border-bottom:1px solid var(--border);}
+  .w-hist-row:last-child{border-bottom:none;}
+  .w-hist-date{font-size:10px;color:var(--text-muted);font-family:var(--mono);}
+  .w-hist-v{font-size:11px;font-family:var(--mono);font-weight:500;}
+  .w-hist-v.deposit{color:var(--green);}
+  .w-hist-v.withdraw{color:var(--red);}
+  .w-hist-v.balance{color:var(--text);}
+  .w-hist-tag{font-size:9px;font-family:var(--mono);padding:1px 5px;border-radius:4px;margin-left:4px;}
+  .w-hist-tag.dep{background:var(--green-dim);color:var(--green);}
+  .w-hist-tag.wit{background:var(--red-dim);color:var(--red);}
+  .w-hist-del{font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;padding:0 2px;margin-left:6px;}
+
+  /* MODAL */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(30,37,53,0.45);z-index:100;align-items:flex-end;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border-radius:18px 18px 0 0;padding:24px 20px 36px;width:100%;}
+  .modal-title{font-size:14px;font-weight:700;margin-bottom:4px;}
+  .modal-sub{font-size:11px;color:var(--text-muted);font-family:var(--mono);margin-bottom:16px;}
+  .modal-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:var(--mono);font-size:15px;color:var(--text);outline:none;margin-bottom:12px;}
+  .modal-actions{display:flex;gap:10px;}
+  .btn{flex:1;padding:12px;border-radius:10px;border:none;font-family:var(--sans);font-size:14px;font-weight:600;cursor:pointer;}
+  .btn-cancel{background:var(--surface2);color:var(--text-muted);border:1px solid var(--border);}
+  .btn-save{background:var(--blue-bright);color:white;}
+
+  /* TOAST */
+  .toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:white;padding:10px 20px;border-radius:10px;font-size:12px;font-family:var(--mono);opacity:0;transition:all .3s;z-index:200;white-space:nowrap;pointer-events:none;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+
+<!-- ══ ROADMAP ══ -->
+<div class="page active" id="page-roadmap">
+  <div class="header">
+    <div class="header-eyebrow">Plano Financeiro Pessoal</div>
+    <div class="header-title">1Mi aos <span>40 anos</span></div>
+    <div class="header-chips">
+      <div class="chip chip-age"><div class="live-dot"></div><span id="age-display">—</span></div>
+      <div class="chip chip-timer">Faltam <b id="time-to-40">—</b> p/ 40</div>
+    </div>
+  </div>
+  <div class="cards">
+    <div class="card accent">
+      <div class="card-label">Patrimônio Total</div>
+      <div class="card-value" id="card-patrimonio">R$0</div>
+      <div class="card-sub">Soma das carteiras</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Tempo p/ Meta</div>
+      <div class="card-value" id="card-tempo" style="font-size:16px">—</div>
+      <div class="card-sub">com yield atual</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Aporte Mensal</div>
+      <div class="card-value green" id="card-aporte">—</div>
+      <div class="card-sub">+ reinvest. total</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Rendim. Mensal</div>
+      <div class="card-value" id="card-rendimento" style="font-size:16px">—</div>
+      <div class="card-sub" id="card-yield-label">—</div>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-header">
+      <span class="progress-label" id="prog-label">—</span>
+      <span class="progress-pct" id="prog-pct">—</span>
+    </div>
+    <div class="progress-track"><div class="progress-fill" id="prog-fill" style="width:1%"></div></div>
+  </div>
+  <div class="divider"></div>
+  <div class="section-title">Configurações</div>
+  <div class="inputs">
+    <div class="input-group"><label>Aporte Mensal (R$)</label><input type="number" id="inp-aporte" inputmode="numeric"></div>
+    <div class="input-group"><label>Yield Anual (%)</label><input type="number" id="inp-yield" step="0.1" inputmode="decimal"></div>
+    <div class="input-group"><label>Meta Final (R$)</label><input type="number" id="inp-meta" inputmode="numeric"></div>
+  </div>
+  <div class="section-title" style="margin-top:6px">Projeção com Juros Compostos</div>
+  <div class="yield-row">
+    <div class="yield-badge"><div class="yb-label">Rendim./mês</div><div class="yb-val" id="yb1">—</div></div>
+    <div class="yield-badge"><div class="yb-label">Entra/mês total</div><div class="yb-val" id="yb2">—</div></div>
+    <div class="yield-badge"><div class="yb-label">Próximo marco</div><div class="yb-val" id="yb3">—</div></div>
+  </div>
+  <div class="section-title" style="margin-top:6px">Roadmap de Marcos</div>
+  <div class="timeline" id="timeline"></div>
+</div>
+
+<!-- ══ CARTEIRAS ══ -->
+<div class="page" id="page-wallets">
+  <div class="w-page-header">
+    <div class="w-page-eye">Meus Investimentos</div>
+    <div class="w-page-title">Carteiras</div>
+    <div class="w-total-row">
+      <div class="w-total-val" id="wt-total">R$0</div>
+      <div class="w-total-lbl">patrimônio total</div>
+    </div>
+  </div>
+  <div class="total-chart-box">
+    <div class="total-chart-lbl">Evolução Total do Patrimônio</div>
+    <div class="total-chart-canvas">
+      <div class="chart-nodata" id="total-nodata">Registre valores nas carteiras para ver o gráfico</div>
+      <canvas id="chart-total" style="display:none;height:130px"></canvas>
+    </div>
+  </div>
+  <div class="wallet-list" id="wallet-list"></div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-roadmap" onclick="switchTab('roadmap')">
+    <span class="tab-icon">🗺️</span>Roadmap
+  </button>
+  <button class="tab-btn" id="tab-wallets" onclick="switchTab('wallets')">
+    <span class="tab-icon">💼</span>Carteiras
+  </button>
+</div>
+
+<!-- DATE MODAL -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Alterar data</div>
+    <div class="modal-sub" id="modal-sub">—</div>
+    <input type="month" class="modal-input" id="modal-input">
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-save" onclick="saveModal()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const BIRTH = new Date(1998,11,22);
+const GOAL_DATE = new Date(2038,11,22);
+
+const WALLETS = [
+  {id:'nubank', name:'Nubank Caixinha', icon:'💜', color:'#8b5cf6', bg:'rgba(139,92,246,0.1)'},
+  {id:'acoes',  name:'Ações',           icon:'📈', color:'#2f6bbf', bg:'rgba(47,107,191,0.1)'},
+  {id:'prev',   name:'Previdência',     icon:'🏦', color:'#2d9e6b', bg:'rgba(45,158,107,0.1)'},
+  {id:'sap',    name:'Ações SAP',       icon:'🔵', color:'#0e7490', bg:'rgba(14,116,144,0.1)'},
+];
+
+const MILESTONES = [
+  {id:'m0',  label:'Ponto de partida',       value:70000,   tag:'start', emoji:'🚀'},
+  {id:'m1',  label:'Marco 1',                value:85000,   tag:'now'},
+  {id:'m2',  label:'Marco 2 — 6 dígitos!',   value:100000,  tag:'near',  emoji:'🎯'},
+  {id:'m3',  label:'Marco 3',                value:125000,  tag:'near'},
+  {id:'m4',  label:'Marco 4',                value:150000,  tag:'near'},
+  {id:'m5',  label:'Marco 5',                value:200000,  tag:'mid',   emoji:'💪'},
+  {id:'m6',  label:'Marco 6',                value:250000,  tag:'mid'},
+  {id:'m7',  label:'Marco 7',                value:300000,  tag:'mid'},
+  {id:'m8',  label:'Marco 8',                value:375000,  tag:'mid'},
+  {id:'m9',  label:'Marco 9 — Meio Milhão!', value:500000,  tag:'far',   emoji:'🔥'},
+  {id:'m10', label:'Marco 10',               value:600000,  tag:'far'},
+  {id:'m11', label:'Marco 11',               value:700000,  tag:'far'},
+  {id:'m12', label:'Marco 12',               value:800000,  tag:'far'},
+  {id:'m13', label:'Marco 13',               value:900000,  tag:'far'},
+  {id:'mf',  label:'META FINAL',             value:1000000, tag:'final', emoji:'🏆'},
+];
+
+// ── STATE ──
+function defaultState() {
+  return {aporte:1500,yield:9,meta:1000000,checks:{},customDates:{},
+    wallets:{nubank:0,acoes:0,prev:0,sap:0},
+    history:{nubank:[],acoes:[],prev:[],sap:[]}};
+}
+let S = (() => {
+  try { const r=localStorage.getItem('mi40_v3'); if(r){const p=JSON.parse(r);return {...defaultState(),...p};} } catch(e){}
+  return defaultState();
+})();
+if(!S.wallets) S.wallets=defaultState().wallets;
+if(!S.history) S.history=defaultState().history;
+// migrate old history entries that have no 'type'
+WALLETS.forEach(w=>{
+  S.history[w.id]=(S.history[w.id]||[]).map(h=>({...h,type:h.type||'deposit'}));
+});
+
+function save(){localStorage.setItem('mi40_v3',JSON.stringify(S));}
+
+const CI={};
+
+// ── HELPERS ──
+const fmt = v=>'R$'+Math.round(Math.abs(v)).toLocaleString('pt-BR');
+function mStr(mo){
+  if(mo<1) return '<1m';
+  const y=Math.floor(mo/12),m=Math.round(mo%12);
+  if(!y) return m+'m'; if(!m) return y+'a'; return y+'a '+m+'m';
+}
+function addMo(d,mo){const r=new Date(d);r.setMonth(r.getMonth()+Math.round(mo));return r;}
+function fmtMY(d){return d.toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).toUpperCase();}
+function nowLabel(){return new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'2-digit'});}
+function totalPat(){return WALLETS.reduce((s,w)=>s+(parseFloat(S.wallets[w.id])||0),0);}
+
+function monthsToReach(target,pv,pmt,yld){
+  if(pv>=target) return 0;
+  const r=yld/100/12; let bal=pv,mo=0;
+  while(bal<target&&mo<12000){bal=bal*(1+r)+pmt;mo++;}
+  return mo;
+}
+
+// ── AGE ──
+function updateAge(){
+  const now=new Date(),diff=now-BIRTH,td=diff/86400000;
+  const y=Math.floor(td/365.25),rem=td-y*365.25,m=Math.floor(rem/30.44),d=Math.floor(rem-m*30.44);
+  document.getElementById('age-display').textContent=`${y} anos, ${m}m e ${d}d`;
+  const toG=GOAL_DATE-now,gd=Math.floor(toG/86400000);
+  const gy=Math.floor(gd/365.25),gr=gd-gy*365.25,gm=Math.floor(gr/30.44),gdd=Math.floor(gr-gm*30.44);
+  document.getElementById('time-to-40').textContent=`${gy}a ${gm}m ${gdd}d`;
+}
+
+// ── TABS ──
+let currentTab='roadmap';
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+tab).classList.add('active');
+  document.getElementById('tab-'+tab).classList.add('active');
+  if(tab==='wallets'){renderWallets();}
+}
+
+// ── RECALC ──
+function recalc(){
+  const PV=totalPat(),PMT=parseFloat(S.aporte)||0,YLD=parseFloat(S.yield)||0,META=parseFloat(S.meta)||1000000;
+  const r=YLD/100/12,mY=PV*r,moM=monthsToReach(META,PV,PMT,YLD),pct=Math.min(100,(PV/META)*100);
+
+  document.getElementById('card-patrimonio').textContent=fmt(PV);
+  document.getElementById('card-aporte').textContent=fmt(PMT);
+  document.getElementById('card-rendimento').textContent=fmt(mY);
+  document.getElementById('card-yield-label').textContent=`yield ${YLD}% a.a.`;
+  document.getElementById('card-tempo').textContent=isFinite(moM)?mStr(moM):'∞';
+  document.getElementById('prog-label').textContent=`${fmt(PV)} → ${fmt(META)}`;
+  document.getElementById('prog-pct').textContent=pct.toFixed(1).replace('.',',')+' %';
+  document.getElementById('prog-fill').style.width=Math.max(1,pct)+'%';
+  document.getElementById('yb1').textContent=fmt(mY)+'/mês';
+  document.getElementById('yb2').textContent=fmt(PMT+mY)+'/mês';
+
+  let nl='—';
+  for(const m of MILESTONES){
+    if(PV<m.value&&!S.checks[m.id]){const mo=monthsToReach(m.value,PV,PMT,YLD);nl=isFinite(mo)?mStr(mo):'∞';break;}
+  }
+  document.getElementById('yb3').textContent=nl;
+  renderTimeline(PV,PMT,YLD,META);
+  if(currentTab==='wallets') renderWallets();
+  save();
+}
+
+// ── TIMELINE ──
+function renderTimeline(PV,PMT,YLD,META){
+  const now=new Date(),tl=document.getElementById('timeline');
+  tl.innerHTML='';
+  const TL={start:'Partida',now:'Em curso',near:'Próximo',mid:'Médio prazo',far:'Longo prazo',final:'Meta Final'};
+  const TC={start:'tag-start',now:'tag-now',near:'tag-near',mid:'tag-mid',far:'tag-far',final:'tag-final'};
+  MILESTONES.forEach((m,i)=>{
+    const chk=!!S.checks[m.id],isFinal=m.id==='mf';
+    let eD;
+    if(S.customDates[m.id]){const p=S.customDates[m.id].split('-');eD=new Date(+p[0],+p[1]-1,1);}
+    else{const mo=monthsToReach(m.value,PV,PMT,YLD);eD=isFinite(mo)?addMo(now,mo):null;}
+    const ds=eD?fmtMY(eD):'—';
+    let dc='tl-dot';
+    if(chk) dc+=' done'; else if(isFinal) dc+=' final'; else if(PV>=m.value*0.9) dc+=' current';
+    const tc=chk?'tag-done':(TC[m.tag]||'tag-far'),tl2=chk?'✓ Alcançado':(TL[m.tag]||'');
+    const yAt=m.value*(YLD/100/12);
+    let aH='';
+    if(chk) aH=`<div class="tl-amount done-c">✓ Meta atingida!</div>`;
+    else if(isFinal) aH=`<div class="tl-amount final-c">${fmt(m.value)} · Renda passiva ${fmt(yAt)}/mês</div>`;
+    else if(PV<m.value){const mo=monthsToReach(m.value,PV,PMT,YLD);aH=`<div class="tl-amount">Faltam ${fmt(m.value-PV)} · ~${isFinite(mo)?mStr(mo):'—'} · Renda: ${fmt(yAt)}/mês</div>`;}
+    else aH=`<div class="tl-amount done-c">Acima deste marco ✓</div>`;
+    const isLast=i===MILESTONES.length-1;
+    tl.innerHTML+=`
+      <div class="tl-item">
+        <div class="tl-left"><div class="${dc}"></div>${!isLast?'<div class="tl-line"></div>':''}</div>
+        <div class="tl-content">
+          <div class="tl-date-row">
+            <span class="tl-date">${ds}</span>
+            ${m.id!=='m0'?`<button class="tl-edit-btn" onclick="openModal('${m.id}','${m.label}','${ds}')">✎ data</button>`:''}
+            <span class="tl-tag ${tc}">${tl2}</span>
+          </div>
+          <div class="tl-name ${chk?'struck':''}">${m.emoji?m.emoji+' ':''}${m.label} — ${fmt(m.value)}</div>
+          ${aH}
+        </div>
+        <div class="tl-check ${chk?'checked':''}" onclick="toggleCheck('${m.id}')"><span class="check-icon">✓</span></div>
+      </div>`;
+  });
+}
+function toggleCheck(id){S.checks[id]=!S.checks[id];showToast(S.checks[id]?'🎉 Marco alcançado!':'Desmarcado');recalc();}
+
+// ── WALLETS ──
+function renderWallets(){
+  const total=totalPat();
+  document.getElementById('wt-total').textContent=fmt(total);
+  renderTotalChart();
+  const list=document.getElementById('wallet-list');
+  list.innerHTML='';
+
+  WALLETS.forEach(w=>{
+    const val=parseFloat(S.wallets[w.id])||0;
+    const hist=S.history[w.id]||[];
+    // last change vs previous deposit
+    let changeHtml='<span class="w-change neutral">Sem histórico anterior</span>';
+    const deposits=hist.filter(h=>h.type==='deposit');
+    if(deposits.length>=2){
+      const prev=deposits[deposits.length-2].value,diff=val-prev;
+      const pct2=prev>0?((diff/prev)*100).toFixed(1):0;
+      const sign=diff>=0?'+':'',cls=diff>=0?'up':'down';
+      changeHtml=`<span class="w-change ${cls}">${sign}${fmt(diff)} (${sign}${pct2}%)</span>`;
+    }
+    const hasCh=deposits.length>=2;
+    // total withdrawn
+    const totalWithdrawn=hist.filter(h=>h.type==='withdraw').reduce((s,h)=>s+h.amount,0);
+    const withdrawnNote=totalWithdrawn>0?`<div style="font-size:9px;color:var(--red);font-family:var(--mono);text-align:right;margin-top:2px;">− ${fmt(totalWithdrawn)} retirado</div>`:'';
+
+    list.innerHTML+=`
+      <div class="w-card">
+        <div class="w-card-top">
+          <div class="w-card-left">
+            <div class="w-icon" style="background:${w.bg}">${w.icon}</div>
+            <div><div class="w-name">${w.name}</div>${changeHtml}</div>
+          </div>
+          <div>
+            <div class="w-val" style="color:${w.color}">${fmt(val)}</div>
+            <div class="w-pct">${total>0?((val/total)*100).toFixed(1)+'% do total':'—'}</div>
+            ${withdrawnNote}
+          </div>
+        </div>
+
+        <div class="w-actions">
+          <input class="w-input" type="number" inputmode="numeric" placeholder="Valor (R$)" id="winp-${w.id}">
+          <button class="w-btn w-btn-add" style="background:${w.color}" onclick="registerWallet('${w.id}','deposit')">＋ Registrar</button>
+          <button class="w-btn w-btn-withdraw" onclick="registerWallet('${w.id}','withdraw')">− Retirar</button>
+        </div>
+
+        ${hasCh?`<div class="w-mini-chart"><canvas id="wchart-${w.id}"></canvas></div>`
+               :`<div class="w-no-chart">📊 Registre 2+ valores para ver o gráfico</div>`}
+
+        <div class="w-hist-bar" onclick="toggleHist('${w.id}')">📋 Histórico (${hist.length}) <span id="htog-${w.id}">▼</span></div>
+        <div class="w-hist-body" id="whist-${w.id}">
+          ${hist.length===0
+            ? '<div style="font-size:11px;color:var(--text-muted);padding:10px 14px;font-family:var(--mono)">Nenhum registro.</div>'
+            : [...hist].reverse().map((h,ri)=>{
+                const realIdx=hist.length-1-ri;
+                if(h.type==='withdraw'){
+                  return `<div class="w-hist-row">
+                    <span class="w-hist-date">${h.date}</span>
+                    <span class="w-hist-v withdraw">− ${fmt(h.amount)} <span class="w-hist-tag wit">retirada</span></span>
+                    <button class="w-hist-del" onclick="delHist('${w.id}',${realIdx})">✕</button>
+                  </div>`;
+                } else {
+                  return `<div class="w-hist-row">
+                    <span class="w-hist-date">${h.date}</span>
+                    <span class="w-hist-v deposit">R$${Math.round(h.value).toLocaleString('pt-BR')} <span class="w-hist-tag dep">saldo</span></span>
+                    <button class="w-hist-del" onclick="delHist('${w.id}',${realIdx})">✕</button>
+                  </div>`;
+                }
+              }).join('')
+          }
+        </div>
+      </div>`;
+  });
+
+  setTimeout(()=>{
+    WALLETS.forEach(w=>{
+      const deposits=(S.history[w.id]||[]).filter(h=>h.type==='deposit');
+      if(deposits.length>=2){
+        const cv=document.getElementById('wchart-'+w.id);
+        if(!cv) return;
+        if(CI['w'+w.id]) CI['w'+w.id].destroy();
+
+        // build chart data with withdrawal markers
+        const labels=deposits.map(h=>h.date);
+        const data=deposits.map(h=>h.value);
+
+        // find withdrawal points to annotate
+        const hist=S.history[w.id]||[];
+        const withdrawDates=hist.filter(h=>h.type==='withdraw').map(h=>h.date);
+
+        CI['w'+w.id]=new Chart(cv,{
+          type:'line',
+          data:{labels,datasets:[{
+            data,borderColor:w.color,backgroundColor:w.bg,
+            fill:true,tension:0.35,pointRadius:4,pointBackgroundColor:w.color,borderWidth:2,
+          }]},
+          options:{responsive:true,maintainAspectRatio:false,
+            plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)}}},
+            scales:{
+              x:{ticks:{font:{size:9},color:'#8492a6',maxTicksLimit:5},grid:{display:false}},
+              y:{ticks:{font:{size:9},color:'#8492a6',callback:v=>'R$'+(v/1000).toFixed(0)+'k'},grid:{color:'#f0f2f5'}}
+            }}
+        });
+      }
+    });
+  },60);
+}
+
+function registerWallet(id, type){
+  const inp=document.getElementById('winp-'+id);
+  const val=parseFloat(inp.value);
+  if(!val||val<=0){showToast('⚠️ Digite um valor válido');return;}
+  const w=WALLETS.find(x=>x.id===id);
+
+  if(type==='deposit'){
+    // Update balance to new total value entered
+    S.wallets[id]=val;
+    S.history[id].push({date:nowLabel(),value:val,type:'deposit'});
+    showToast('✅ '+w.name+' atualizado!');
+  } else {
+    // Subtract from current balance
+    const current=parseFloat(S.wallets[id])||0;
+    if(val>current){showToast('⚠️ Valor maior que o saldo atual');return;}
+    const newBal=current-val;
+    S.wallets[id]=newBal;
+    S.history[id].push({date:nowLabel(),value:newBal,amount:val,type:'withdraw'});
+    showToast('💸 Retirada de '+fmt(val)+' registrada');
+  }
+  inp.value='';
+  save();
+  recalc();
+  renderWallets();
+}
+
+function delHist(wid,idx){
+  S.history[wid].splice(idx,1);
+  // recalculate balance from last deposit entry
+  const deps=S.history[wid].filter(h=>h.type==='deposit');
+  S.wallets[wid]=deps.length>0?deps[deps.length-1].value:0;
+  save();recalc();renderWallets();
+}
+
+function toggleHist(id){
+  const el=document.getElementById('whist-'+id),tog=document.getElementById('htog-'+id);
+  el.classList.toggle('open');tog.textContent=el.classList.contains('open')?'▲':'▼';
+}
+
+function renderTotalChart(){
+  const allDates=new Set();
+  WALLETS.forEach(w=>(S.history[w.id]||[]).filter(h=>h.type==='deposit').forEach(h=>allDates.add(h.date)));
+  const dates=[...allDates].sort();
+  const nd=document.getElementById('total-nodata'),cv=document.getElementById('chart-total');
+  if(dates.length<2){nd.style.display='';cv.style.display='none';return;}
+  nd.style.display='none';cv.style.display='';
+  const totals=dates.map(date=>WALLETS.reduce((sum,w)=>{
+    const h=(S.history[w.id]||[]).filter(x=>x.type==='deposit'&&x.date<=date);
+    return sum+(h.length>0?h[h.length-1].value:0);
+  },0));
+  if(CI.total) CI.total.destroy();
+  CI.total=new Chart(cv,{
+    type:'line',
+    data:{labels:dates,datasets:[{
+      data:totals,borderColor:'#2f6bbf',backgroundColor:'rgba(47,107,191,0.08)',
+      fill:true,tension:0.35,pointRadius:3,pointBackgroundColor:'#2f6bbf',borderWidth:2,
+    }]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.raw)}}},
+      scales:{
+        x:{ticks:{font:{size:9},color:'#8492a6',maxTicksLimit:8},grid:{display:false}},
+        y:{ticks:{font:{size:9},color:'#8492a6',callback:v=>'R$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},grid:{color:'#f0f2f5'}}
+      }}
+  });
+}
+
+// ── MODAL ──
+let modalTarget=null;
+function openModal(id,label,currentDate){
+  modalTarget=id;
+  document.getElementById('modal-title').textContent=label;
+  document.getElementById('modal-sub').textContent='Data estimada: '+currentDate;
+  document.getElementById('modal-input').value=S.customDates[id]||'';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal(){document.getElementById('modal').classList.remove('open');modalTarget=null;}
+function saveModal(){
+  const val=document.getElementById('modal-input').value;
+  if(val&&modalTarget) S.customDates[modalTarget]=val; else if(modalTarget) delete S.customDates[modalTarget];
+  closeModal();showToast('✅ Data atualizada');recalc();
+}
+document.getElementById('modal').addEventListener('click',e=>{if(e.target===document.getElementById('modal'))closeModal();});
+
+// ── TOAST ──
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2300);
+}
+
+// ── INPUTS ──
+[['inp-aporte','aporte'],['inp-yield','yield'],['inp-meta','meta']].forEach(([eid,key])=>{
+  const el=document.getElementById(eid);el.value=S[key];
+  el.addEventListener('input',()=>{S[key]=parseFloat(el.value)||0;recalc();});
+});
+
+// ── BOOT ──
+updateAge();setInterval(updateAge,1000);recalc();
+</script>
+</body>
+</html>
