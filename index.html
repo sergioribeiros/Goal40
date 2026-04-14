@@ -19,6 +19,13 @@
   *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
   body{background:var(--bg);color:var(--text);font-family:var(--sans);min-height:100vh;padding-bottom:72px;}
 
+  /* SYNC INDICATOR */
+  .sync-bar{display:flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:10px;font-family:var(--mono);color:var(--text-muted);}
+  .sync-dot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;}
+  .sync-dot.syncing{background:#f59e0b;animation:pulse 1s infinite;}
+  .sync-dot.error{background:var(--red);}
+  .sync-btn{margin-left:auto;font-size:10px;color:var(--blue-bright);font-family:var(--mono);border:none;background:none;cursor:pointer;text-decoration:underline dotted;}
+
   /* TABS */
   .tab-bar{position:fixed;bottom:0;left:0;right:0;z-index:50;background:var(--surface);border-top:1px solid var(--border);display:flex;height:58px;box-shadow:0 -2px 12px rgba(30,37,53,0.08);}
   .tab-btn{flex:1;border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-family:var(--sans);font-size:10px;color:var(--text-muted);font-weight:500;}
@@ -102,6 +109,9 @@
   .tl-amount{font-size:11px;font-family:var(--mono);color:var(--blue-mid);margin-top:2px;}
   .tl-amount.done-c{color:var(--green);}
   .tl-amount.final-c{color:var(--blue-bright);font-weight:700;font-size:13px;}
+  .tl-status{font-size:11px;font-family:var(--mono);margin-top:3px;font-weight:600;}
+  .tl-status.ahead{color:var(--green);}
+  .tl-status.late{color:var(--red);}
   .tl-check{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--blue-dim);background:var(--surface);flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:var(--shadow);}
   .tl-check.checked{background:var(--green-dim);border-color:var(--green);}
   .check-icon{font-size:11px;color:var(--green);font-weight:700;display:none;}
@@ -131,7 +141,6 @@
   .w-val{font-size:18px;font-weight:700;font-family:var(--mono);}
   .w-pct{font-size:9px;color:var(--text-muted);font-family:var(--mono);text-align:right;margin-top:2px;}
 
-  /* ACTION ROWS */
   .w-actions{display:flex;gap:8px;padding:0 14px 12px;}
   .w-input{flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-family:var(--mono);font-size:14px;color:var(--text);outline:none;-webkit-appearance:none;min-width:0;}
   .w-input:focus{border-color:var(--blue-mid);}
@@ -175,6 +184,13 @@
 </style>
 </head>
 <body>
+
+<!-- SYNC BAR -->
+<div class="sync-bar">
+  <div class="sync-dot" id="sync-dot"></div>
+  <span id="sync-label">Carregando...</span>
+  <button class="sync-btn" onclick="syncNow()">↻ Sincronizar</button>
+</div>
 
 <!-- ══ ROADMAP ══ -->
 <div class="page active" id="page-roadmap">
@@ -278,6 +294,93 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ── GIST CONFIG ──
+const GIST_TOKEN = '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';
+const GIST_ID    = 'c2fb0cd59a1856d8e1f942efd85aaac5';
+const GIST_FILE  = '1mi-aos-40.json';
+
+// ── SYNC STATE ──
+let syncTimer = null;
+let lastSaved = null;
+
+function setSyncStatus(status, msg) {
+  const dot = document.getElementById('sync-dot');
+  const lbl = document.getElementById('sync-label');
+  dot.className = 'sync-dot' + (status === 'syncing' ? ' syncing' : status === 'error' ? ' error' : '');
+  lbl.textContent = msg;
+}
+
+async function loadFromGist() {
+  setSyncStatus('syncing', 'Carregando do Gist...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      headers: { Authorization: `token ${GIST_TOKEN}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const content = data.files[GIST_FILE]?.content;
+    if (content) {
+      const parsed = JSON.parse(content);
+      S = { ...defaultState(), ...parsed };
+      if (!S.wallets) S.wallets = defaultState().wallets;
+      if (!S.history) S.history = defaultState().history;
+      WALLETS.forEach(w => {
+        S.history[w.id] = (S.history[w.id] || []).map(h => ({ ...h, type: h.type || 'deposit' }));
+      });
+      // sync inputs
+      [['inp-aporte','aporte'],['inp-yield','yield'],['inp-meta','meta']].forEach(([eid,key]) => {
+        const el = document.getElementById(eid);
+        if (el) el.value = S[key];
+      });
+      recalc();
+    }
+    const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    setSyncStatus('ok', `Sincronizado às ${now}`);
+    lastSaved = JSON.stringify(S);
+  } catch(e) {
+    setSyncStatus('error', 'Erro ao carregar — usando local');
+    console.error(e);
+  }
+}
+
+async function saveToGist() {
+  const payload = JSON.stringify(S);
+  if (payload === lastSaved) return; // nada mudou
+  setSyncStatus('syncing', 'Salvando...');
+  try {
+    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `token ${GIST_TOKEN}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ files: { [GIST_FILE]: { content: payload } } })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    setSyncStatus('ok', `Salvo às ${now}`);
+    lastSaved = payload;
+    // também salva local como fallback
+    try { localStorage.setItem('mi40_v3', payload); } catch(e) {}
+  } catch(e) {
+    setSyncStatus('error', 'Erro ao salvar no Gist');
+    console.error(e);
+  }
+}
+
+// debounce: salva 2s depois da última mudança
+function scheduleSave() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(saveToGist, 2000);
+}
+
+function syncNow() {
+  if (syncTimer) clearTimeout(syncTimer);
+  loadFromGist();
+}
+
+// ── CONSTANTS ──
 const BIRTH = new Date(1998,11,22);
 const GOAL_DATE = new Date(2038,11,22);
 
@@ -288,23 +391,58 @@ const WALLETS = [
   {id:'sap',    name:'Ações SAP',       icon:'🔵', color:'#0e7490', bg:'rgba(14,116,144,0.1)'},
 ];
 
-const MILESTONES = [
-  {id:'m0',  label:'Ponto de partida',       value:70000,   tag:'start', emoji:'🚀'},
-  {id:'m1',  label:'Marco 1',                value:85000,   tag:'now'},
-  {id:'m2',  label:'Marco 2 — 6 dígitos!',   value:100000,  tag:'near',  emoji:'🎯'},
-  {id:'m3',  label:'Marco 3',                value:125000,  tag:'near'},
-  {id:'m4',  label:'Marco 4',                value:150000,  tag:'near'},
-  {id:'m5',  label:'Marco 5',                value:200000,  tag:'mid',   emoji:'💪'},
-  {id:'m6',  label:'Marco 6',                value:250000,  tag:'mid'},
-  {id:'m7',  label:'Marco 7',                value:300000,  tag:'mid'},
-  {id:'m8',  label:'Marco 8',                value:375000,  tag:'mid'},
-  {id:'m9',  label:'Marco 9 — Meio Milhão!', value:500000,  tag:'far',   emoji:'🔥'},
-  {id:'m10', label:'Marco 10',               value:600000,  tag:'far'},
-  {id:'m11', label:'Marco 11',               value:700000,  tag:'far'},
-  {id:'m12', label:'Marco 12',               value:800000,  tag:'far'},
-  {id:'m13', label:'Marco 13',               value:900000,  tag:'far'},
-  {id:'mf',  label:'META FINAL',             value:1000000, tag:'final', emoji:'🏆'},
-];
+// ── GERAÇÃO DINÂMICA DE MARCOS (curva de juros compostos, datas fixas a cada 6 meses) ──
+function generateMilestones() {
+  const GOAL_VAL   = parseFloat(S.meta) || 1000000;
+  const r          = (parseFloat(S.yield) || 9) / 100 / 12;
+  const pmt        = parseFloat(S.aporte) || 1500;
+  const today      = new Date();
+  const goal40     = new Date(2038, 11, 22);
+
+  function pvNeeded(fv, months) {
+    if (months <= 0) return fv;
+    const growth  = Math.pow(1 + r, months);
+    const annuity = pmt * (growth - 1) / r;
+    return (fv - annuity) / growth;
+  }
+
+  function monthsBetween(a, b) {
+    return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  }
+
+  const milestones = [];
+  // primeiro marco: próximo múltiplo de 6m a partir de hoje
+  const start = new Date(today);
+  start.setMonth(start.getMonth() + 6);
+  start.setDate(1);
+
+  let d = new Date(start);
+  let idx = 0;
+  while (d < goal40) {
+    const mLeft   = monthsBetween(d, goal40);
+    const needed  = Math.max(0, Math.round(pvNeeded(GOAL_VAL, mLeft)));
+    const label   = d.toLocaleDateString('pt-BR', {month:'short', year:'numeric'}).toUpperCase().replace('. DE ', '/');
+    const isPast  = d < today;
+    milestones.push({
+      id:    'm' + idx,
+      label,
+      value: needed,
+      fixedDate: new Date(d),
+      tag:   isPast ? 'done' : (mLeft > 84 ? 'far' : mLeft > 36 ? 'mid' : mLeft > 12 ? 'near' : 'now'),
+    });
+    d = new Date(d);
+    d.setMonth(d.getMonth() + 6);
+    idx++;
+  }
+  // marco final fixo
+  milestones.push({
+    id: 'mf', label: 'DEZ/2038', value: GOAL_VAL,
+    fixedDate: goal40, tag: 'final', emoji: '🏆'
+  });
+  return milestones;
+}
+
+let MILESTONES = generateMilestones();
 
 // ── STATE ──
 function defaultState() {
@@ -312,20 +450,25 @@ function defaultState() {
     wallets:{nubank:0,acoes:0,prev:0,sap:0},
     history:{nubank:[],acoes:[],prev:[],sap:[]}};
 }
+
+// carrega do localStorage como fallback inicial enquanto o Gist carrega
 let S = (() => {
   try { const r=localStorage.getItem('mi40_v3'); if(r){const p=JSON.parse(r);return {...defaultState(),...p};} } catch(e){}
   return defaultState();
 })();
 if(!S.wallets) S.wallets=defaultState().wallets;
 if(!S.history) S.history=defaultState().history;
-// migrate old history entries that have no 'type'
 WALLETS.forEach(w=>{
   S.history[w.id]=(S.history[w.id]||[]).map(h=>({...h,type:h.type||'deposit'}));
 });
 
-function save(){localStorage.setItem('mi40_v3',JSON.stringify(S));}
+// substitui localStorage.setItem — agora agenda save no Gist
+function save() {
+  try { localStorage.setItem('mi40_v3', JSON.stringify(S)); } catch(e) {}
+  scheduleSave();
+}
 
-const CI={};
+const CI = {};
 
 // ── HELPERS ──
 const fmt = v=>'R$'+Math.round(Math.abs(v)).toLocaleString('pt-BR');
@@ -369,6 +512,7 @@ function switchTab(tab){
 
 // ── RECALC ──
 function recalc(){
+  MILESTONES = generateMilestones(); // regenera com yield/aporte/meta atuais
   const PV=totalPat(),PMT=parseFloat(S.aporte)||0,YLD=parseFloat(S.yield)||0,META=parseFloat(S.meta)||1000000;
   const r=YLD/100/12,mY=PV*r,moM=monthsToReach(META,PV,PMT,YLD),pct=Math.min(100,(PV/META)*100);
 
@@ -383,9 +527,16 @@ function recalc(){
   document.getElementById('yb1').textContent=fmt(mY)+'/mês';
   document.getElementById('yb2').textContent=fmt(PMT+mY)+'/mês';
 
+  // próximo marco não atingido
+  const today = new Date();
   let nl='—';
   for(const m of MILESTONES){
-    if(PV<m.value&&!S.checks[m.id]){const mo=monthsToReach(m.value,PV,PMT,YLD);nl=isFinite(mo)?mStr(mo):'∞';break;}
+    if(m.fixedDate > today && PV < m.value){
+      const diffMs = m.fixedDate - today;
+      const diffM  = Math.round(diffMs / (1000*60*60*24*30.44));
+      nl = mStr(diffM) + ' ('+m.label+')';
+      break;
+    }
   }
   document.getElementById('yb3').textContent=nl;
   renderTimeline(PV,PMT,YLD,META);
@@ -395,43 +546,71 @@ function recalc(){
 
 // ── TIMELINE ──
 function renderTimeline(PV,PMT,YLD,META){
-  const now=new Date(),tl=document.getElementById('timeline');
+  const now=new Date();
+  const tl=document.getElementById('timeline');
   tl.innerHTML='';
-  const TL={start:'Partida',now:'Em curso',near:'Próximo',mid:'Médio prazo',far:'Longo prazo',final:'Meta Final'};
-  const TC={start:'tag-start',now:'tag-now',near:'tag-near',mid:'tag-mid',far:'tag-far',final:'tag-final'};
-  MILESTONES.forEach((m,i)=>{
-    const chk=!!S.checks[m.id],isFinal=m.id==='mf';
-    let eD;
-    if(S.customDates[m.id]){const p=S.customDates[m.id].split('-');eD=new Date(+p[0],+p[1]-1,1);}
-    else{const mo=monthsToReach(m.value,PV,PMT,YLD);eD=isFinite(mo)?addMo(now,mo):null;}
-    const ds=eD?fmtMY(eD):'—';
-    let dc='tl-dot';
-    if(chk) dc+=' done'; else if(isFinal) dc+=' final'; else if(PV>=m.value*0.9) dc+=' current';
-    const tc=chk?'tag-done':(TC[m.tag]||'tag-far'),tl2=chk?'✓ Alcançado':(TL[m.tag]||'');
-    const yAt=m.value*(YLD/100/12);
-    let aH='';
-    if(chk) aH=`<div class="tl-amount done-c">✓ Meta atingida!</div>`;
-    else if(isFinal) aH=`<div class="tl-amount final-c">${fmt(m.value)} · Renda passiva ${fmt(yAt)}/mês</div>`;
-    else if(PV<m.value){const mo=monthsToReach(m.value,PV,PMT,YLD);aH=`<div class="tl-amount">Faltam ${fmt(m.value-PV)} · ~${isFinite(mo)?mStr(mo):'—'} · Renda: ${fmt(yAt)}/mês</div>`;}
-    else aH=`<div class="tl-amount done-c">Acima deste marco ✓</div>`;
-    const isLast=i===MILESTONES.length-1;
-    tl.innerHTML+=`
+
+  const TC={now:'tag-now',near:'tag-near',mid:'tag-mid',far:'tag-far',final:'tag-final',done:'tag-done'};
+  const TL={now:'Próximo',near:'Em breve',mid:'Médio prazo',far:'Longo prazo',final:'Meta Final',done:'Passado'};
+
+  MILESTONES.forEach((m, i) => {
+    const isFinal  = m.id === 'mf';
+    const isPast   = m.fixedDate < now;
+    const isNext   = !isPast && MILESTONES.slice(0,i).every(x => x.fixedDate < now);
+
+    // status financeiro neste marco
+    const ahead    = PV >= m.value;    // patrimônio atual já atingiu ou superou
+    const diff     = PV - m.value;     // positivo = adiantado, negativo = atrasado
+    const diffAbs  = Math.abs(diff);
+
+    // dot style
+    let dc = 'tl-dot';
+    if (isFinal)     dc += ' final';
+    else if (ahead)  dc += ' done';
+    else if (isNext) dc += ' current';
+
+    // tag
+    let tagClass, tagText;
+    if (isFinal)       { tagClass='tag-final'; tagText='🏆 Meta Final'; }
+    else if (isPast && ahead)  { tagClass='tag-done';  tagText='✓ Superado'; }
+    else if (isPast && !ahead) { tagClass='tag-near';  tagText='⚠️ Passado'; }
+    else if (isNext)   { tagClass='tag-now';   tagText='📍 Próximo'; }
+    else               { tagClass=TC[m.tag]||'tag-far'; tagText=TL[m.tag]||''; }
+
+    // status financeiro
+    let statusHtml = '';
+    if (isFinal) {
+      const yAt = m.value*(YLD/100/12);
+      statusHtml = `<div class="tl-amount final-c">${fmt(m.value)} · Renda passiva ${fmt(yAt)}/mês</div>`;
+    } else if (ahead) {
+      statusHtml = `<div class="tl-status ahead">▲ ${fmt(diffAbs)} adiantado neste marco</div>`;
+    } else {
+      const behind = diffAbs;
+      const urgency = isPast ? 'tl-status late' : 'tl-amount';
+      statusHtml = `<div class="${urgency}">${isPast?'⚠️':'▼'} Faltam ${fmt(behind)} para este marco</div>`;
+    }
+
+    // data fixa formatada
+    const ds = m.fixedDate.toLocaleDateString('pt-BR',{month:'short',year:'numeric'}).toUpperCase();
+    const isLast = i === MILESTONES.length - 1;
+
+    tl.innerHTML += `
       <div class="tl-item">
-        <div class="tl-left"><div class="${dc}"></div>${!isLast?'<div class="tl-line"></div>':''}</div>
+        <div class="tl-left">
+          <div class="${dc}"></div>
+          ${!isLast?'<div class="tl-line"></div>':''}
+        </div>
         <div class="tl-content">
           <div class="tl-date-row">
             <span class="tl-date">${ds}</span>
-            ${m.id!=='m0'?`<button class="tl-edit-btn" onclick="openModal('${m.id}','${m.label}','${ds}')">✎ data</button>`:''}
-            <span class="tl-tag ${tc}">${tl2}</span>
+            <span class="tl-tag ${tagClass}">${tagText}</span>
           </div>
-          <div class="tl-name ${chk?'struck':''}">${m.emoji?m.emoji+' ':''}${m.label} — ${fmt(m.value)}</div>
-          ${aH}
+          <div class="tl-name">${m.emoji?m.emoji+' ':''}${m.label} — ${fmt(m.value)}</div>
+          ${statusHtml}
         </div>
-        <div class="tl-check ${chk?'checked':''}" onclick="toggleCheck('${m.id}')"><span class="check-icon">✓</span></div>
       </div>`;
   });
 }
-function toggleCheck(id){S.checks[id]=!S.checks[id];showToast(S.checks[id]?'🎉 Marco alcançado!':'Desmarcado');recalc();}
 
 // ── WALLETS ──
 function renderWallets(){
@@ -444,7 +623,6 @@ function renderWallets(){
   WALLETS.forEach(w=>{
     const val=parseFloat(S.wallets[w.id])||0;
     const hist=S.history[w.id]||[];
-    // last change vs previous deposit
     let changeHtml='<span class="w-change neutral">Sem histórico anterior</span>';
     const deposits=hist.filter(h=>h.type==='deposit');
     if(deposits.length>=2){
@@ -454,7 +632,6 @@ function renderWallets(){
       changeHtml=`<span class="w-change ${cls}">${sign}${fmt(diff)} (${sign}${pct2}%)</span>`;
     }
     const hasCh=deposits.length>=2;
-    // total withdrawn
     const totalWithdrawn=hist.filter(h=>h.type==='withdraw').reduce((s,h)=>s+h.amount,0);
     const withdrawnNote=totalWithdrawn>0?`<div style="font-size:9px;color:var(--red);font-family:var(--mono);text-align:right;margin-top:2px;">− ${fmt(totalWithdrawn)} retirado</div>`:'';
 
@@ -471,16 +648,13 @@ function renderWallets(){
             ${withdrawnNote}
           </div>
         </div>
-
         <div class="w-actions">
           <input class="w-input" type="number" inputmode="numeric" placeholder="Valor (R$)" id="winp-${w.id}">
           <button class="w-btn w-btn-add" style="background:${w.color}" onclick="registerWallet('${w.id}','deposit')">＋ Registrar</button>
           <button class="w-btn w-btn-withdraw" onclick="registerWallet('${w.id}','withdraw')">− Retirar</button>
         </div>
-
         ${hasCh?`<div class="w-mini-chart"><canvas id="wchart-${w.id}"></canvas></div>`
                :`<div class="w-no-chart">📊 Registre 2+ valores para ver o gráfico</div>`}
-
         <div class="w-hist-bar" onclick="toggleHist('${w.id}')">📋 Histórico (${hist.length}) <span id="htog-${w.id}">▼</span></div>
         <div class="w-hist-body" id="whist-${w.id}">
           ${hist.length===0
@@ -513,19 +687,10 @@ function renderWallets(){
         const cv=document.getElementById('wchart-'+w.id);
         if(!cv) return;
         if(CI['w'+w.id]) CI['w'+w.id].destroy();
-
-        // build chart data with withdrawal markers
-        const labels=deposits.map(h=>h.date);
-        const data=deposits.map(h=>h.value);
-
-        // find withdrawal points to annotate
-        const hist=S.history[w.id]||[];
-        const withdrawDates=hist.filter(h=>h.type==='withdraw').map(h=>h.date);
-
         CI['w'+w.id]=new Chart(cv,{
           type:'line',
-          data:{labels,datasets:[{
-            data,borderColor:w.color,backgroundColor:w.bg,
+          data:{labels:deposits.map(h=>h.date),datasets:[{
+            data:deposits.map(h=>h.value),borderColor:w.color,backgroundColor:w.bg,
             fill:true,tension:0.35,pointRadius:4,pointBackgroundColor:w.color,borderWidth:2,
           }]},
           options:{responsive:true,maintainAspectRatio:false,
@@ -545,14 +710,11 @@ function registerWallet(id, type){
   const val=parseFloat(inp.value);
   if(!val||val<=0){showToast('⚠️ Digite um valor válido');return;}
   const w=WALLETS.find(x=>x.id===id);
-
   if(type==='deposit'){
-    // Update balance to new total value entered
     S.wallets[id]=val;
     S.history[id].push({date:nowLabel(),value:val,type:'deposit'});
     showToast('✅ '+w.name+' atualizado!');
   } else {
-    // Subtract from current balance
     const current=parseFloat(S.wallets[id])||0;
     if(val>current){showToast('⚠️ Valor maior que o saldo atual');return;}
     const newBal=current-val;
@@ -561,14 +723,11 @@ function registerWallet(id, type){
     showToast('💸 Retirada de '+fmt(val)+' registrada');
   }
   inp.value='';
-  save();
-  recalc();
-  renderWallets();
+  save();recalc();renderWallets();
 }
 
 function delHist(wid,idx){
   S.history[wid].splice(idx,1);
-  // recalculate balance from last deposit entry
   const deps=S.history[wid].filter(h=>h.type==='deposit');
   S.wallets[wid]=deps.length>0?deps[deps.length-1].value:0;
   save();recalc();renderWallets();
@@ -636,7 +795,10 @@ function showToast(msg){
 });
 
 // ── BOOT ──
-updateAge();setInterval(updateAge,1000);recalc();
+updateAge();
+setInterval(updateAge,1000);
+recalc(); // render com dados do localStorage enquanto carrega
+loadFromGist(); // carrega do Gist e atualiza
 </script>
 </body>
 </html>
