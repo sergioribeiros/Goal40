@@ -294,10 +294,8 @@
 <div class="toast" id="toast"></div>
 
 <script>
-// ── GIST CONFIG ──
-const GIST_TOKEN = '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';
-const GIST_ID    = 'c2fb0cd59a1856d8e1f942efd85aaac5';
-const GIST_FILE  = '1mi-aos-40.json';
+// ── WORKER CONFIG ──
+const WORKER_URL = 'https://mi40-sync.sergiog-schmitt-ribeiro.workers.dev';
 
 // ── SYNC STATE ──
 let syncTimer = null;
@@ -311,15 +309,12 @@ function setSyncStatus(status, msg) {
 }
 
 async function loadFromGist() {
-  setSyncStatus('syncing', 'Carregando do Gist...');
+  setSyncStatus('syncing', 'Carregando...');
   try {
-    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
-      headers: { Authorization: `token ${GIST_TOKEN}`, Accept: 'application/vnd.github.v3+json' }
-    });
+    const res = await fetch(WORKER_URL);
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-    const content = data.files[GIST_FILE]?.content;
-    if (content) {
+    const content = await res.text();
+    if (content && content !== '{}') {
       const parsed = JSON.parse(content);
       S = { ...defaultState(), ...parsed };
       if (!S.wallets) S.wallets = defaultState().wallets;
@@ -327,7 +322,6 @@ async function loadFromGist() {
       WALLETS.forEach(w => {
         S.history[w.id] = (S.history[w.id] || []).map(h => ({ ...h, type: h.type || 'deposit' }));
       });
-      // sync inputs
       [['inp-aporte','aporte'],['inp-yield','yield'],['inp-meta','meta']].forEach(([eid,key]) => {
         const el = document.getElementById(eid);
         if (el) el.value = S[key];
@@ -345,26 +339,21 @@ async function loadFromGist() {
 
 async function saveToGist() {
   const payload = JSON.stringify(S);
-  if (payload === lastSaved) return; // nada mudou
+  if (payload === lastSaved) return;
   setSyncStatus('syncing', 'Salvando...');
   try {
-    const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+    const res = await fetch(WORKER_URL, {
       method: 'PATCH',
-      headers: {
-        Authorization: `token ${GIST_TOKEN}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ files: { [GIST_FILE]: { content: payload } } })
+      headers: { 'Content-Type': 'application/json' },
+      body: payload
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const now = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     setSyncStatus('ok', `Salvo às ${now}`);
     lastSaved = payload;
-    // também salva local como fallback
     try { localStorage.setItem('mi40_v3', payload); } catch(e) {}
   } catch(e) {
-    setSyncStatus('error', 'Erro ao salvar no Gist');
+    setSyncStatus('error', 'Erro ao salvar');
     console.error(e);
   }
 }
