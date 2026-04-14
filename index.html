@@ -391,59 +391,6 @@ const WALLETS = [
   {id:'sap',    name:'Ações SAP',       icon:'🔵', color:'#0e7490', bg:'rgba(14,116,144,0.1)'},
 ];
 
-// ── GERAÇÃO DINÂMICA DE MARCOS (curva de juros compostos, datas fixas a cada 6 meses) ──
-function generateMilestones() {
-  const GOAL_VAL   = parseFloat(S.meta) || 1000000;
-  const r          = (parseFloat(S.yield) || 9) / 100 / 12;
-  const pmt        = parseFloat(S.aporte) || 1500;
-  const today      = new Date();
-  const goal40     = new Date(2038, 11, 22);
-
-  function pvNeeded(fv, months) {
-    if (months <= 0) return fv;
-    const growth  = Math.pow(1 + r, months);
-    const annuity = pmt * (growth - 1) / r;
-    return (fv - annuity) / growth;
-  }
-
-  function monthsBetween(a, b) {
-    return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
-  }
-
-  const milestones = [];
-  // primeiro marco: próximo múltiplo de 6m a partir de hoje
-  const start = new Date(today);
-  start.setMonth(start.getMonth() + 6);
-  start.setDate(1);
-
-  let d = new Date(start);
-  let idx = 0;
-  while (d < goal40) {
-    const mLeft   = monthsBetween(d, goal40);
-    const needed  = Math.max(0, Math.round(pvNeeded(GOAL_VAL, mLeft)));
-    const label   = d.toLocaleDateString('pt-BR', {month:'short', year:'numeric'}).toUpperCase().replace('. DE ', '/');
-    const isPast  = d < today;
-    milestones.push({
-      id:    'm' + idx,
-      label,
-      value: needed,
-      fixedDate: new Date(d),
-      tag:   isPast ? 'done' : (mLeft > 84 ? 'far' : mLeft > 36 ? 'mid' : mLeft > 12 ? 'near' : 'now'),
-    });
-    d = new Date(d);
-    d.setMonth(d.getMonth() + 6);
-    idx++;
-  }
-  // marco final fixo
-  milestones.push({
-    id: 'mf', label: 'DEZ/2038', value: GOAL_VAL,
-    fixedDate: goal40, tag: 'final', emoji: '🏆'
-  });
-  return milestones;
-}
-
-let MILESTONES = generateMilestones();
-
 // ── STATE ──
 function defaultState() {
   return {aporte:1500,yield:9,meta:1000000,checks:{},customDates:{},
@@ -461,6 +408,55 @@ if(!S.history) S.history=defaultState().history;
 WALLETS.forEach(w=>{
   S.history[w.id]=(S.history[w.id]||[]).map(h=>({...h,type:h.type||'deposit'}));
 });
+
+// ── GERAÇÃO DINÂMICA DE MARCOS (curva de juros compostos, datas fixas a cada 6 meses) ──
+function generateMilestones() {
+  const GOAL_VAL = parseFloat(S.meta)   || 1000000;
+  const r        = (parseFloat(S.yield) || 9) / 100 / 12;
+  const pmt      = parseFloat(S.aporte) || 1500;
+  const today    = new Date();
+  const goal40   = new Date(2038, 11, 22);
+
+  function pvNeeded(fv, months) {
+    if (months <= 0) return fv;
+    const growth  = Math.pow(1 + r, months);
+    const annuity = pmt * (growth - 1) / r;
+    return (fv - annuity) / growth;
+  }
+
+  function monthsBetween(a, b) {
+    return (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
+  }
+
+  const milestones = [];
+  const start = new Date(today);
+  start.setMonth(start.getMonth() + 6);
+  start.setDate(1);
+
+  let d = new Date(start);
+  let idx = 0;
+  while (d < goal40) {
+    const mLeft  = monthsBetween(d, goal40);
+    const needed = Math.max(0, Math.round(pvNeeded(GOAL_VAL, mLeft)));
+    const label  = d.toLocaleDateString('pt-BR', {month:'short', year:'numeric'}).toUpperCase().replace('. DE ', '/');
+    const isPast = d < today;
+    milestones.push({
+      id: 'm' + idx, label, value: needed,
+      fixedDate: new Date(d),
+      tag: isPast ? 'past' : (mLeft > 84 ? 'far' : mLeft > 36 ? 'mid' : mLeft > 12 ? 'near' : 'now'),
+    });
+    d = new Date(d);
+    d.setMonth(d.getMonth() + 6);
+    idx++;
+  }
+  milestones.push({
+    id: 'mf', label: 'DEZ/2038', value: GOAL_VAL,
+    fixedDate: goal40, tag: 'final', emoji: '🏆'
+  });
+  return milestones;
+}
+
+let MILESTONES = generateMilestones();
 
 // substitui localStorage.setItem — agora agenda save no Gist
 function save() {
